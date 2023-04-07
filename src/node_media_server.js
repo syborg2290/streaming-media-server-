@@ -1,18 +1,13 @@
-//
-//  Created by Mingliang Chen on 17/8/1.
-//  illuspas[a]gmail.com
-//  Copyright (c) 2018 Nodemedia. All rights reserved.
-//
 
-const Https = require('https');
-const Logger = require('./node_core_logger');
-const NodeRtmpServer = require('./node_rtmp_server');
-const NodeHttpServer = require('./node_http_server');
-const NodeTransServer = require('./node_trans_server');
-const NodeRelayServer = require('./node_relay_server');
-const NodeFissionServer = require('./node_fission_server');
-const context = require('./node_core_ctx');
-const Package = require('../package.json');
+const Https = require("https");
+const Logger = require("./node_core_logger");
+const NodeRtmpServer = require("./node_rtmp_server");
+const NodeHttpServer = require("./node_http_server");
+const NodeTransServer = require("./node_trans_server");
+const NodeRelayServer = require("./node_relay_server");
+const NodeFissionServer = require("./node_fission_server");
+const context = require("./node_core_ctx");
+const Package = require("../package.json");
 
 class NodeMediaServer {
   constructor(config) {
@@ -34,7 +29,7 @@ class NodeMediaServer {
 
     if (this.config.trans) {
       if (this.config.cluster) {
-        Logger.log('NodeTransServer does not work in cluster mode');
+        Logger.log("NodeTransServer does not work in cluster mode");
       } else {
         this.nts = new NodeTransServer(this.config);
         this.nts.run();
@@ -43,7 +38,7 @@ class NodeMediaServer {
 
     if (this.config.relay) {
       if (this.config.cluster) {
-        Logger.log('NodeRelayServer does not work in cluster mode');
+        Logger.log("NodeRelayServer does not work in cluster mode");
       } else {
         this.nls = new NodeRelayServer(this.config);
         this.nls.run();
@@ -52,40 +47,48 @@ class NodeMediaServer {
 
     if (this.config.fission) {
       if (this.config.cluster) {
-        Logger.log('NodeFissionServer does not work in cluster mode');
+        Logger.log("NodeFissionServer does not work in cluster mode");
       } else {
         this.nfs = new NodeFissionServer(this.config);
         this.nfs.run();
       }
     }
 
-    process.on('uncaughtException', function (err) {
-      Logger.error('uncaughtException', err);
+    process.on("uncaughtException", function (err) {
+      Logger.error("uncaughtException", err);
     });
 
-    process.on('SIGINT', function() {
+    process.on("SIGINT", function () {
       process.exit();
     });
 
-    Https.get('https://registry.npmjs.org/node-media-server', function (res) {
-      let size = 0;
-      let chunks = [];
-      res.on('data', function (chunk) {
-        size += chunk.length;
-        chunks.push(chunk);
-      });
-      res.on('end', function () {
-        let data = Buffer.concat(chunks, size);
-        let jsonData = JSON.parse(data.toString());
-        let latestVersion = jsonData['dist-tags']['latest'];
-        let latestVersionNum = latestVersion.split('.')[0] << 16 | latestVersion.split('.')[1] << 8 | latestVersion.split('.')[2] & 0xff;
-        let thisVersionNum = Package.version.split('.')[0] << 16 | Package.version.split('.')[1] << 8 | Package.version.split('.')[2] & 0xff;
-        if (thisVersionNum < latestVersionNum) {
-          Logger.log(`There is a new version ${latestVersion} that can be updated`);
-        }
-      });
-    }).on('error', function (e) {
-    });
+    // Https.get("https://registry.npmjs.org/node-media-server", function (res) {
+    //   let size = 0;
+    //   let chunks = [];
+    //   res.on("data", function (chunk) {
+    //     size += chunk.length;
+    //     chunks.push(chunk);
+    //   });
+    //   res.on("end", function () {
+    //     let data = Buffer.concat(chunks, size);
+    //     console.log(data);
+    //     let jsonData = JSON.parse(data.toString());
+    //     let latestVersion = jsonData["dist-tags"]["latest"];
+    //     let latestVersionNum =
+    //       (latestVersion.split(".")[0] << 16) |
+    //       (latestVersion.split(".")[1] << 8) |
+    //       (latestVersion.split(".")[2] & 0xff);
+    //     let thisVersionNum =
+    //       (Package.version.split(".")[0] << 16) |
+    //       (Package.version.split(".")[1] << 8) |
+    //       (Package.version.split(".")[2] & 0xff);
+    //     if (thisVersionNum < latestVersionNum) {
+    //       Logger.log(
+    //         `There is a new version ${latestVersion} that can be updated`
+    //       );
+    //     }
+    //   });
+    // }).on("error", function (e) {});
   }
 
   on(eventName, listener) {
