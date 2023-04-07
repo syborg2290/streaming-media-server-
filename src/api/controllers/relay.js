@@ -14,6 +14,7 @@ const { once } = require('events');
  * @param {*} next 
  */
 function getStreams(req, res, next) {
+ 
   let stats = {};
   this.sessions.forEach(function (session, id) {
     if (session.constructor.name !== 'NodeRelaySession') {
@@ -72,6 +73,7 @@ function getStreamByID(req, res, next) {
  * @param {*} next 
  */
 function getStreamByName(req, res, next) {
+  
   const relaySession = Array.from(this.sessions.values()).filter(
     (session) =>
       session.constructor.name === 'NodeRelaySession' &&

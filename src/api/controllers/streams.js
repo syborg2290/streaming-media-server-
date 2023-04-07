@@ -111,6 +111,7 @@ function getStreams(req, res, next) {
 }
 
 function getStream(req, res, next) {
+  
   let streamStats = {
     isLive: false,
     viewers: 0,
