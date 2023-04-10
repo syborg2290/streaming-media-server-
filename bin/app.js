@@ -40,17 +40,9 @@ const config = {
   },
   http: {
     port: 8000,
-    mediaroot: "./public",
-    allow_origin: "*",
-  },
-  hls: {
-    fragment_length: 5,
-    fragment_type: "mpegts",
-    start_sequence: 0,
-    end_sequence: "inf",
-    static: true,
-    cleanup: true,
-    hls_path: "./public/hls",
+    mediaroot: './media/steamvideo',
+    webroot: './www',
+    allow_origin: '*'
   },
   https: {
     port: argv.https_port,
@@ -65,6 +57,24 @@ const config = {
     publish: false,
     secret: "nodemedia2017privatekey",
   },
+  trans: {  
+    ffmpeg: "/usr/bin/ffmpeg",
+    tasks: [  
+      {
+        app: 'live',
+        vc: "copy",
+        vcParam: [],
+        ac: "aac",
+        acParam: ['-ab', '64k', '-ac', '1', '-ar', '44100'],
+        rtmp:true,
+        rtmpApp:'live2',
+        hls: true,
+        hlsFlags: '[hls_time=2:hls_list_size=3:hls_flags=delete_segments]',
+        dash: true,
+        dashFlags: '[f=dash:window_size=3:extra_window_size=5]'
+      }
+    ]
+  },  
 };
 
 let nms = new NodeMediaServer(config);
