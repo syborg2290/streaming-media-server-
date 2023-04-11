@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const { spawn } = require("child_process");
+const createPlaylist = require("./create-playlist");
+const isEmpty = require("lodash/isEmpty");
 
 const NodeMediaServer = require("..");
 let argv = require("minimist")(process.argv.slice(2), {
@@ -40,17 +42,9 @@ const config = {
   },
   http: {
     port: 8000,
-    mediaroot: "./public",
+    mediaroot: "./media/steamvideo",
+    webroot: "./www",
     allow_origin: "*",
-  },
-  hls: {
-    fragment_length: 5,
-    fragment_type: "mpegts",
-    start_sequence: 0,
-    end_sequence: "inf",
-    static: true,
-    cleanup: true,
-    hls_path: "./public/hls",
   },
   https: {
     port: argv.https_port,
@@ -65,120 +59,149 @@ const config = {
     publish: false,
     secret: "nodemedia2017privatekey",
   },
+  relay: {
+    ffmpeg: "/usr/bin/ffmpeg",
+    tasks: [
+      {
+        app: "stream",
+        mode: "push",
+        edge: "rtmp://127.0.0.1/hls_1080p",
+      },
+      {
+        app: "stream",
+        mode: "push",
+        edge: "rtmp://127.0.0.1/hls_720p",
+      },
+      {
+        app: "stream",
+        mode: "push",
+        edge: "rtmp://127.0.0.1/hls_480p",
+      },
+      {
+        app: "stream",
+        mode: "push",
+        edge: "rtmp://127.0.0.1/hls_360p",
+      },
+    ],
+  },
+  trans: {
+    ffmpeg: "/usr/bin/ffmpeg",
+    tasks: [
+      {
+        app: "hls_1080p",
+        hls: true,
+        ac: "aac",
+        acParam: ["-b:a", "192k", "-ar", 48000],
+        vcParams: [
+          "-vf",
+          "'scale=1920:-1'",
+          "-b:v",
+          "5000k",
+          "-preset",
+          "fast",
+          "-profile:v",
+          "baseline",
+          "-bufsize",
+          "7500k",
+        ],
+        hlsFlags: "[hls_time=10:hls_list_size=0:hls_flags=delete_segments]",
+      },
+      {
+        app: "hls_720p",
+        hls: true,
+        ac: "aac",
+        acParam: ["-b:a", "128k", "-ar", 48000],
+        vcParams: [
+          "-vf",
+          "'scale=1280:-1'",
+          "-b:v",
+          "2800k",
+          "-preset",
+          "fast",
+          "-profile:v",
+          "baseline",
+          "-bufsize",
+          "4200k",
+        ],
+        hlsFlags: "[hls_time=10:hls_list_size=0:hls_flags=delete_segments]",
+      },
+      {
+        app: "hls_480p",
+        hls: true,
+        ac: "aac",
+        acParam: ["-b:a", "128k", "-ar", 48000],
+        vcParams: [
+          "-vf",
+          "'scale=854:-1'",
+          "-b:v",
+          "1400k",
+          "-preset",
+          "fast",
+          "-profile:v",
+          "baseline",
+          "-bufsize",
+          "2100k",
+        ],
+        hlsFlags: "[hls_time=10:hls_list_size=0:hls_flags=delete_segments]",
+      },
+      {
+        app: "hls_360p",
+        hls: true,
+        ac: "aac",
+        acParam: ["-b:a", "96k", "-ar", 48000],
+        vcParams: [
+          "-vf",
+          "'scale=480:-1'",
+          "-b:v",
+          "800k",
+          "-preset",
+          "fast",
+          "-profile:v",
+          "baseline",
+          "-bufsize",
+          "1200k",
+        ],
+        hlsFlags: "[hls_time=10:hls_list_size=0:hls_flags=delete_segments]",
+      },
+    ],
+  },
 };
 
 let nms = new NodeMediaServer(config);
 nms.run();
 
-nms.on("preConnect", (id, args) => {
-  console.log(
-    "[NodeEvent on preConnect]",
-    `id=${id} args=${JSON.stringify(args)}`
-  );
-  // let session = nms.getSession(id);
-  // session.reject();
+var tokens = {};
+
+const parseStreamName = (streamPath) => {
+  return streamPath
+    .replace("/hls_1080", "")
+    .replace("/hls_720p", "")
+    .replace("/hls_480p/", "")
+    .replace("/hls_360p/", "")
+    .replace("/stream/", "");
+};
+
+nms.on("prePublish", async (id, StreamPath, args) => {
+  const streamName = parseStreamName(StreamPath);
+  console.log(`${streamName} has started streaming`);
+  if (args.streamKey && args.streamToken) {
+    tokens[streamName] = {
+      app: "stream",
+      streamKey: args.streamKey,
+      streamToken: args.streamToken,
+    };
+  }
+
 });
 
-nms.on("postConnect", (id, args) => {
-  console.log(
-    "[NodeEvent on postConnect]",
-    `id=${id} args=${JSON.stringify(args)}`
-  );
+nms.on("postPublish", async (_id, StreamPath, _args) => {
+  if (StreamPath.indexOf("hls_") != -1) {
+    const name = StreamPath.split("/").pop();
+    createPlaylist(name);
+  }
 });
 
-nms.on("doneConnect", (id, args) => {
-  console.log(
-    "[NodeEvent on doneConnect]",
-    `id=${id} args=${JSON.stringify(args)}`
-  );
-});
-
-nms.on("prePublish", (id, StreamPath, args) => {
-  console.log(
-    "[NodeEvent on prePublish]",
-    `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`
-  );
-
-  // const streamKey = StreamPath.split("/")[1];
-
-  // // Set up the HLS transcoding options for FFmpeg
-  // const hlsOptions = [
-  //   "-c:v",
-  //   "libx264",
-  //   "-c:a",
-  //   "aac",
-  //   "-f",
-  //   "hls",
-  //   "-hls_time",
-  //   "5",
-  //   "-hls_playlist_type",
-  //   "vod", // Use 'event' for live streaming
-  //   "-start_number",
-  //   "0",
-  //   `public/hls/${streamKey}/playlist.m3u8`, // Output path for HLS manifest
-  // ];
-
-  // // Execute FFmpeg command to convert RTMP to HLS
-  // const ffmpeg = spawn("ffmpeg", [
-  //   "-i",
-  //   `rtmp://localhost/${StreamPath}`,
-  //   ...hlsOptions,
-  // ]);
-
-  // // Log FFmpeg output
-  // ffmpeg.stdout.on("data", (data) => {
-  //   console.log(`[FFmpeg] ${data}`);
-  // });
-
-  // ffmpeg.stderr.on("data", (data) => {
-  //   console.log(data);
-  //   console.error(`[FFmpeg] ${data}`);
-  // });
-
-  // ffmpeg.on("close", (code) => {
-  //   console.log(`[FFmpeg] child process exited with code ${code}`);
-  // });
-
-  // // Return false to stop NMS from processing the RTMP stream
-  // return false;
-
-  // let session = nms.getSession(id);
-  // session.reject();
-});
-
-nms.on("postPublish", (id, StreamPath, args) => {
-  console.log(
-    "[NodeEvent on postPublish]",
-    `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`
-  );
-});
-
-nms.on("donePublish", (id, StreamPath, args) => {
-  console.log(
-    "[NodeEvent on donePublish]",
-    `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`
-  );
-});
-
-nms.on("prePlay", (id, StreamPath, args) => {
-  console.log(
-    "[NodeEvent on prePlay]",
-    `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`
-  );
-  // let session = nms.getSession(id);
-  // session.reject();
-});
-
-nms.on("postPlay", (id, StreamPath, args) => {
-  console.log(
-    "[NodeEvent on postPlay]",
-    `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`
-  );
-});
-
-nms.on("donePlay", (id, StreamPath, args) => {
-  console.log(
-    "[NodeEvent on donePlay]",
-    `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`
-  );
+nms.on("donePublish", async (id, StreamPath, _args) => {
+  const streamName = parseStreamName(StreamPath);
+  console.log(`${streamName} has stopped streaming...`);
 });
